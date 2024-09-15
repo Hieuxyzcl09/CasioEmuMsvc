@@ -74,7 +74,9 @@ int main(int argc, char* argv[]) {
 	int imgFlags = IMG_INIT_PNG;
 	if (IMG_Init(imgFlags) != imgFlags)
 		PANIC("IMG_Init failed: %s\n", IMG_GetError());
-
+	if (headless && argv_map["model"].empty()) {
+		PANIC("No model path supplied.\n");
+	}
 	if (argv_map["model"].empty()) {
 		auto s = sui_loop();
 		argv_map["model"] = std::move(s);

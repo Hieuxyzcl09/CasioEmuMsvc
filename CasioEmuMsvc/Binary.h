@@ -28,14 +28,6 @@
 #include <cstring>
 #pragma warning(push)
 #pragma warning(disable : 4267)
-#if defined(__clang__) // TRANSITION, DevCom-1627396
-namespace std {
-    template<class _From, class _To>
-    concept convertible_to =
-    __is_convertible_to(_From, _To)
-    && requires { static_cast<_To>(std::declval<_From>()); };
-}
-#endif // ^^^ no workaround ^^^
 
 template <class T>
 concept trivial = std::is_trivial<T>::value;
