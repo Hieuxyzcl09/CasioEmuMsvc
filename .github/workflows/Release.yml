@@ -1,18 +1,16 @@
-name: MSBuild
+name: MSBuild and Release
 
 on:
-  pull_request:
-    branches: [ "stable" ]
-  workflow_dispatch:
   push:
-    branches: [ "stable" ]
+    tags:
+      - "v*.*.*"
 
 env:
   SOLUTION_FILE_PATH: .
   BUILD_CONFIGURATION: Release
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -36,17 +34,21 @@ jobs:
     - name: Build x86
       working-directory: ${{env.GITHUB_WORKSPACE}}
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} /p:Platform=x86 ${{env.SOLUTION_FILE_PATH}}
-      
-    - name: Upload x86 Build Artifact
-      uses: actions/upload-artifact@v4.4.0
-      with:
-        name: Release-x86
-        path: .\Release
-        if-no-files-found: error
 
-    - name: Upload x64 Build Artifact
-      uses: actions/upload-artifact@v4.4.0
+    - name: Compress x64 Output
+      run: Compress-Archive -Path .\x64\Release\ -DestinationPath Release-x64.zip
+      shell: pwsh
+
+    - name: Compress x86 Output
+      run: Compress-Archive -Path .\Release\ -DestinationPath Release-x86.zip
+      shell: pwsh
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v2.0.8
       with:
-        name: Release-x64
-        path: .\x64\Release\
-        if-no-files-found: error
+        files: |
+          Release-x64.zip
+          Release-x86.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
