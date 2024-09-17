@@ -238,7 +238,7 @@ namespace casioemu {
 	}
 
 	void RealTimeClock::Reset() {
-		RTCCON = 0;
+		// RTCCON = 0;
 	}
 	Peripheral* CreateRtc(Emulator& emu) {
 		return new RealTimeClock(emu);

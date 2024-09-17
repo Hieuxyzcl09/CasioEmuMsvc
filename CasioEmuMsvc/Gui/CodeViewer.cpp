@@ -107,12 +107,14 @@ void CodeViewer::PrepareDisasm() {
 	std::thread t1([this]() {
 #ifndef _DEBUG
 		printf("[UI][Info] Start to disasm ...\n");
-		auto dat = std::unique_ptr<uint8_t>(new uint8_t[m_emu->chipset.rom_data.size() + 0x100]);
-		std::memset(dat.get(), 0xff, m_emu->chipset.rom_data.size() + 0x100);
-		std::memcpy(dat.get(), m_emu->chipset.rom_data.data(), m_emu->chipset.rom_data.size());
+		auto dat = std::unique_ptr<uint8_t>(new uint8_t[0x80100]);
+		std::memset(dat.get(), 0xff, 0x80100);
+		std::memcpy(dat.get(), m_emu->chipset.rom_data.data(), std::min((size_t)0x5e000, m_emu->chipset.rom_data.size()));
+		if (m_emu->chipset.rom_data.size() >= 0x60000) // TODO: fix this hack!!!
+			std::memcpy(dat.get() + 0x70000, m_emu->chipset.rom_data.data() + 0x5e000, 0x2000);
 		uint8_t* beg = dat.get();
 		auto rom = beg;
-		auto end = rom + m_emu->chipset.rom_data.size();
+		auto end = rom + 0x80000;
 		printf("[UI][Info] Pass1: decoding opcodes...\n");
 		std::stringstream ss{};
 		while (rom < end) {
