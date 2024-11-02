@@ -207,10 +207,10 @@ namespace casioemu {
 			if (sb < 3) {
 				sb = 3;
 			}
-			auto contrast = (int)screen_contrast - 11;
-			if (screen_contrast2_en) {
-				contrast += screen_contrast2 * 0.5;
-			}
+			auto contrast = (int)screen_contrast;
+			//if (screen_contrast2_en) {
+			//	contrast += screen_contrast2 * 0.5;
+			//}
 			if (contrast < 0) {
 				contrast = 0;
 			}
@@ -723,7 +723,7 @@ namespace casioemu {
 			}
 			else {
 				region_buffer.Setup(
-					0xF800, (N_ROW + 1) * ROW_SIZE, "Screen/Buffer", this,
+					0xF800, (N_ROW + 1)* ROW_SIZE, "Screen/Buffer", this,
 					[](MMURegion* region, size_t offset) {
 						offset -= region->base;
 						if (offset % ROW_SIZE >= ROW_SIZE_DISP)
@@ -741,8 +741,11 @@ namespace casioemu {
 							return;
 
 						auto this_obj = (Screen*)region->userdata;
-						// * Set require_frame to true only if the value changed.
-						if (((Screen*)region->userdata)->screen_select & 0x04) {
+						if (!(this_obj->screen_mode & 0x40)) {
+							this_obj->screen_buffer1[offset] = this_obj->screen_buffer[offset] = data;
+							return;
+						}
+						if (this_obj->screen_select & 0x04) {
 							this_obj->screen_buffer1[offset] = data;
 						}
 						else {
@@ -808,7 +811,6 @@ namespace casioemu {
 						auto old = screen->screen_mode & 0b1000;
 						auto new_ = data & 0b1000;
 						if (old ^ new_) {
-							// TODO: 交换缓冲区有效视窗位数据
 							auto sb = screen->screen_buffer;
 							for (int iy = 0; iy != (N_ROW + 1); ++iy) {
 								for (int ix = 0; ix != ROW_SIZE_DISP; ++ix) {

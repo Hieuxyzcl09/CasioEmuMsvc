@@ -189,6 +189,12 @@
     <ClCompile Include="Ext\vibration.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Chipset\ePS6800.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Peripheral\Spi.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.hpp">
@@ -410,10 +416,17 @@
     <ClInclude Include="Gui.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Peripheral\Spi.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Peripheral\SD\FakeSdCard.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include=".clang-format" />
+    <None Include="Peripheral\SD\HowToCreateASDCard.md" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="icon.ico">

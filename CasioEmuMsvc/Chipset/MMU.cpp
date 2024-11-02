@@ -109,6 +109,9 @@ namespace casioemu {
 		// if (offset >= (1 << 24))
 		//	PANIC("offset doesn't fit 24 bits\n");
 #ifdef DBG
+		if (offset == 0x60722) { // Debug printf
+
+		}
 		if (softwareRead) {
 			MemoryEventArgs mea{};
 			mea.offset = static_cast<uint32_t>(offset);

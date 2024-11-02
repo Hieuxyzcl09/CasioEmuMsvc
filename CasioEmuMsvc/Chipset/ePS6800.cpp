@@ -134,7 +134,7 @@ namespace casioemu {
 					};
 				};
 			} CPUCON;
-		};
+		} regs;
 
 		uint8_t impl_flags_changed, impl_flags_out, impl_flags_in;
 		uint8_t impl_shift_buffer;
@@ -154,12 +154,12 @@ namespace casioemu {
 		void OP_NOP() {}
 
 		void OP_WDTC() {
-			reg_wdt = 0;
-			reg_to = 1;
-			reg_pd = 1;
+			// reg_wdt = 0;
+			regs.STATUS.TO = 1;
+			regs.STATUS.PD = 1;
 		}
 		void OP_SLEP() {
-			if (reg_ms1) {
+			if (regs.CPUCON.MS1) {
 				// IDLE mode
 			}
 			else {
@@ -167,48 +167,48 @@ namespace casioemu {
 			}
 		}
 		void OP_BANK() {
-			reg_bsr = impl_operands[0].value;
+			regs.BSR = impl_operands[0].value;
 		}
 		void OP_S0CALL() {
-			stack[reg_sp--] = reg_pc;
-			reg_sp &= 0x1f;
-			reg_pc = impl_operands[0].value & 0xfff;
+			stack[regs.STKPTR--] = *(uint16_t*)&regs.PCL;
+			regs.STKPTR &= 0x1f;
+			*(uint16_t*)&regs.PCL = impl_operands[0].value & 0xfff;
 		}
 		void OP_SCALL() {
-			stack[reg_sp--] = reg_pc;
-			reg_sp &= 0x1f;
-			reg_pc = (reg_pc & ~0x1fff) | (impl_operands[0].value & 0x1fff);
+			stack[regs.STKPTR--] = *(uint16_t*)&regs.PCL;
+			regs.STKPTR &= 0x1f;
+			*(uint16_t*)&regs.PCL = (*(uint16_t*)&regs.PCL & ~0x1fff) | (impl_operands[0].value & 0x1fff);
 		}
 		// takes a imm16
 		void OP_LCALL() {
-			stack[reg_sp--] = reg_pc;
-			reg_sp &= 0x1f;
-			reg_pc = impl_long_imm;
+			stack[regs.STKPTR--] = *(uint16_t*)&regs.PCL;
+			regs.STKPTR &= 0x1f;
+			*(uint16_t*)&regs.PCL = impl_long_imm;
 		}
 		void OP_RET() {
-			reg_pc = stack[reg_sp--];
-			reg_sp &= 0x1f;
+			*(uint16_t*)&regs.PCL = stack[regs.STKPTR--];
+			regs.STKPTR &= 0x1f;
 		}
 		void OP_RETI() {
-			reg_pc = stack[reg_sp--];
-			reg_sp &= 0x1f;
-			interrupt_enable = true;
+			*(uint16_t*)&regs.PCL = stack[regs.STKPTR--];
+			regs.STKPTR &= 0x1f;
+			regs.CPUCON.GLINT = true;
 		}
 		void OP_TEST() {
-			flag_z = !DataRef(impl_operands[0].value);
+			regs.STATUS.Z = !DataRef(impl_operands[0].value);
 		}
 		void OP_SJMP() {
-			reg_pc = (reg_pc & ~0x1fff) | (impl_operands[0].value & 0x1fff);
+			*(uint16_t*)&regs.PCL = (*(uint16_t*)&regs.PCL & ~0x1fff) | (impl_operands[0].value & 0x1fff);
 		}
 		// imm16
 		void OP_LJMP() {
-			reg_pc = impl_long_imm;
+			*(uint16_t*)&regs.PCL = impl_long_imm;
 		}
 		void OP_MOVAR() {
-			flag_z = !(reg_a = DataRef(impl_operands[0].value));
+			regs.STATUS.Z = !(regs.ACC = DataRef(impl_operands[0].value));
 		}
 		void OP_MOVRA() {
-			DataRef(impl_operands[0].value) = reg_a;
+			DataRef(impl_operands[0].value) = regs.ACC;
 		}
 		void OP_MOVPR() {
 			// mov [r] to special function register
@@ -217,17 +217,17 @@ namespace casioemu {
 			// mov special function register to [r]
 		}
 		void OP_MOVAK() {
-			reg_a = impl_operands[0].value;
+			regs.ACC = impl_operands[0].value;
 		}
 		void OP_CLR() {
 			DataRef(impl_operands[0].value) = 0;
-			flag_z = true;
+			regs.STATUS.Z = true;
 		}
 		void OP_COM() {
-			flag_z = !(DataRef(impl_operands[0].value) = ~DataRef(impl_operands[0].value));
+			regs.STATUS.Z = !(DataRef(impl_operands[0].value) = ~DataRef(impl_operands[0].value));
 		}
 		void OP_COMA() {
-			flag_z = !(reg_a = ~DataRef(impl_operands[0].value));
+			regs.STATUS.Z = !(regs.ACC = ~DataRef(impl_operands[0].value));
 		}
 	};
 } // namespace casioemu

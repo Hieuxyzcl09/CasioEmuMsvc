@@ -33,6 +33,9 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <Spi.h>
+
+#include "Peripheral/SD/FakeSdCard.h"
 
 namespace casioemu {
 	void* Chipset::QueryInterface(const char* name) {
@@ -482,11 +485,15 @@ namespace casioemu {
 			peripherals.push_front(CreateTimerBaseCounter(emulator));
 			peripherals.push_front(CreateRtc(emulator));
 			peripherals.push_front(CreateWatchdog(emulator));
-			if (emulator.hardware_id == HW_CLASSWIZ_II)
+			if (emulator.hardware_id == HW_CLASSWIZ_II) {
 				peripherals.push_front(CreateBcdCalc(emulator));
+				peripherals.push_front(CreateSpi(emulator));
+			}
 			if (emulator.hardware_id == HW_CLASSWIZ)
 				peripherals.push_front(CreateFlash(emulator));
 		}
+
+		new FakeSdCard(QueryInterface<ISpiProvider>());
 	}
 
 	void Chipset::DestructPeripherals() {
