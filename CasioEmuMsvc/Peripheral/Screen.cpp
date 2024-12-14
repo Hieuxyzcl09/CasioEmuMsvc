@@ -32,8 +32,8 @@
 #include <array>
 #include <cstdlib> // for std::rand
 #include <ctime>   // for std::time
-#include <vector>
 #include <iomanip>
+#include <vector>
 
 inline constexpr uint8_t reverse_bits(uint8_t n) {
 	uint8_t reversed = 0;
@@ -69,18 +69,31 @@ namespace casioemu {
 		const char* name;
 		uint8_t mask, offset;
 	};
-	inline void update_screen_scan_alpha(float* screen_scan_alpha, float t, float screen_refresh_rate) {
-		// auto t_mod = fmodf(t,screen_refresh_rate);
-		if (screen_refresh_rate < screen_flashing_threshold) { // thd
+	inline int update_screen_scan_alpha(float* screen_scan_alpha, Uint64 t, int screen_refresh_rate) {
+		int n = (static_cast<Uint64>((t * screen_refresh_rate) / 250)) % 64;
+
+		if (screen_refresh_rate < screen_flashing_threshold) {
 			for (size_t i = 0; i < 64; i++) {
-				screen_scan_alpha[i] = 1;
+				screen_scan_alpha[i] = 1.0f;
 			}
-			return;
+			return n;
 		}
-		float position = fmodf(t * pow(screen_refresh_rate, -0.6) * 5, 64);
+
+		// 计算归一化所需的归一化因子
+		float normalization_factor = 0.0f;
+		std::vector<float> exp_values(64);
+
 		for (size_t i = 0; i < 64; i++) {
-			screen_scan_alpha[(i + int(floor(position))) % 64] = screen_flashing_brightness_coeff - i / 64. * screen_flashing_brightness_coeff;
+			exp_values[i] = std::exp(-screen_flashing_brightness_coeff * i / 64.0f);
+			normalization_factor += exp_values[i];
 		}
+
+		// 归一化
+		for (size_t i = 0; i < 64; i++) {
+			screen_scan_alpha[(i + n) % 64] = std::pow(exp_values[i] / normalization_factor * 80.,0.2);
+		}
+
+		return n;
 	}
 	template <HardwareId hardware_id>
 	class Screen : public Peripheral {
@@ -90,11 +103,11 @@ namespace casioemu {
 			ROW_SIZE_DISP,
 			SPR_MAX;
 
-		MMURegion region_buffer{}, region_buffer1{}, region_contrast{}, region_brightness{}, region_contrast2{}, region_mode{}, region_range{}, region_select{}, region_offset{}, region_refresh_rate{};
-		uint8_t *screen_buffer{}, *screen_buffer1{}, screen_contrast{}, screen_brightness{}, screen_contrast2{}, screen_mode{}, screen_range{}, screen_select{}, screen_offset{}, screen_refresh_rate{};
+		MMURegion region_buffer{}, region_buffer1{}, region_contrast{}, region_brightness{}, region_scan_report_op1{}, region_mode{}, region_range{}, region_select{}, region_offset{}, region_refresh_rate{}, region_scan_report{};
+		uint8_t *screen_buffer{}, *screen_buffer1{}, screen_contrast{}, screen_brightness{}, screen_scan_report_op1{}, screen_mode{}, screen_range{}, screen_select{}, screen_offset{}, screen_refresh_rate{}, screen_scan_report{};
 
-		MMURegion region_power{}, region_contrast2_en{};
-		uint8_t screen_power{}, screen_contrast2_en{};
+		MMURegion region_power{}, region_scan_report_en{};
+		uint8_t screen_power{}, screen_scan_report_en{};
 
 		MMURegion region_unk1{}, region_unk2{};
 
@@ -198,7 +211,8 @@ namespace casioemu {
 			if (screen_refresh_rate < screen_flashing_threshold && !enable_screen_fading)
 				;
 			else {
-				update_screen_scan_alpha(screen_scan_alpha, SDL_GetTicks64(), screen_refresh_rate);
+				int n = update_screen_scan_alpha(screen_scan_alpha, SDL_GetTicks64(), screen_refresh_rate);
+				screen_scan_report = ((n / (screen_scan_report_en ? screen_scan_report_op1 : 64)) % 2 ? 3 : 0) ^ (n % 64 == 0 ? 1 : (n % 64 == 32 ? 2 : 0));
 			}
 			if (screen_refresh_rate < 6) {
 				screen_refresh_rate = 6;
@@ -882,15 +896,27 @@ namespace casioemu {
 				region_brightness.Setup(0xF033, 1, "Screen/Brightness", &screen_brightness, MMURegion::DefaultRead<uint8_t, 0x07>,
 					MMURegion::DefaultWrite<uint8_t, 0x07>, emulator);
 
-				region_contrast2.Setup(0xF035, 1, "Screen/Contrast2", &screen_contrast2, MMURegion::DefaultRead<uint8_t, 0x1F>,
-					MMURegion::DefaultWrite<uint8_t, 0x1F>, emulator);
+				/*
+cwx中F03B的值应该是由屏幕扫描和F035/F036决定的
+1.每行扫描的时间大概是( [0xF034] * 25 ) us
+2.F03B的mask是3，屏幕每扫描( [0xF036] == 0 ? 64 : [0xF035] )行后F03B的基础值会在0和3之间切换，如果F036是0的话这个循环的半周期和屏幕扫描应该是对齐的，也就是F03B的基础值切换后对应屏幕的第0行扫描（注：F035.0始终为1）
+3.扫描屏幕的第0行 (对应bit0?) 及第32行 (对应bit1?) 时，F03B对应的bit会反转
 
-				region_contrast2_en.Setup(0xF036, 1, "Screen/Contrast2EN", &screen_contrast2_en, MMURegion::DefaultRead<uint8_t, 0b1001>,
+n为行扫描计数，[0xF03B] = ( ( n / ( [0xF036] == 0 ? 64 : [0xF035] ) ) % 2 ? 3 : 0 ) ^ ( n % 64 == 0 ? 1 : ( n % 64 == 32 ? 2 : 0)  )
+				*/
+
+				region_scan_report_op1.Setup(0xF035, 1, "Screen/ScanReportOption1", &screen_scan_report_op1, MMURegion::DefaultRead<uint8_t, 0x1E>,
+					MMURegion::DefaultWrite<uint8_t, 0x1E>, emulator);
+
+				region_scan_report_en.Setup(0xF036, 1, "Screen/ScanReportOptionEnable", &screen_scan_report_en, MMURegion::DefaultRead<uint8_t, 0b1001>,
 					MMURegion::DefaultWrite<uint8_t, 0b1001>, emulator);
+
+				region_scan_report.Setup(0xF03B, 1, "Screen/ScanReport", &screen_scan_report, MMURegion::DefaultRead<uint8_t, 0x3>,
+					MMURegion::IgnoreWrite, emulator);
 			}
 			else {
-				screen_contrast2 = 0x17;
-				screen_contrast2_en = 1;
+				screen_scan_report_op1 = 0x17;
+				screen_scan_report_en = 1;
 			}
 
 			if constexpr (hardware_id == HardwareId::HW_ES_PLUS) {
@@ -901,6 +927,7 @@ namespace casioemu {
 				region_offset.Setup(0xF039, 1, "Screen/DSPOFST", &screen_offset, MMURegion::DefaultRead<uint8_t, 0x3F>,
 					MMURegion::DefaultWrite<uint8_t, 0x3F>, emulator);
 
+				// 25us
 				region_refresh_rate.Setup(0xF034, 1, "Screen/RefreshRate", &screen_refresh_rate, MMURegion::DefaultRead<uint8_t, 0x7F>,
 					MMURegion::DefaultWrite<uint8_t, 0x7F>, emulator);
 			}
@@ -935,10 +962,12 @@ namespace casioemu {
 		if constexpr (hardware_id == HW_CLASSWIZ || hardware_id == HW_CLASSWIZ_II) {
 			screen_select = 0;
 			region_select.Kill();
-			screen_contrast2 = 0;
-			region_contrast2.Kill();
-			screen_contrast2_en = 0;
-			region_contrast2_en.Kill();
+			screen_scan_report_op1 = 0;
+			region_scan_report_op1.Kill();
+			screen_scan_report_en = 0;
+			region_scan_report_en.Kill();
+			screen_scan_report = 0;
+			region_scan_report.Kill();
 			region_unk1.Kill();
 			region_unk2.Kill();
 			screen_brightness = 0;
@@ -1070,7 +1099,6 @@ namespace casioemu {
 			emulator.screenshot_requested.store(false);
 		}
 	}
-
 
 	template <HardwareId hardware_id>
 	void Screen<hardware_id>::Reset() {
