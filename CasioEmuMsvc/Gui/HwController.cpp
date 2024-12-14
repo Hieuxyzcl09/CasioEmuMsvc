@@ -11,6 +11,10 @@ float screen_flashing_brightness_coeff = 1.5f;
 int screen_buffer_select = 0;
 bool audio_enable = false;
 void HwController::RenderCore() {
+
+	if (ImGui::Button("Screenshot the screen")) {
+
+	}
 	ImGui::SliderInt(
 #if LANGUAGE == 2
 		"闪屏模拟阈值"

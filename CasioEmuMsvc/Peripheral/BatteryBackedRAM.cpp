@@ -7,6 +7,7 @@
 #include <SDL.h>
 #include <cstring>
 #include <fstream>
+#include <algorithm>
 
 namespace casioemu {
 	inline void fillRandomData(unsigned char* buf, size_t size) {
