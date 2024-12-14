@@ -18,6 +18,7 @@
 #include "imgui/imgui_impl_sdlrenderer2.h"
 #include <Gui.h>
 #include <SDL.h>
+#include "AddressWindow.h"
 #include <filesystem>
 
 char* n_ram_buffer = 0;
@@ -132,7 +133,8 @@ int test_gui(bool* guiCreated, SDL_Window* wnd, SDL_Renderer* rnd) {
 			 CreateCallAnalysisWindow(),
 			 code_viewer = new CodeViewer(),
 			 injector = new Injector(),
-			 membp = new MemBreakPoint()})
+			 membp = new MemBreakPoint(),
+			 CreateAddressWindow()})
 		windows.push_back(item);
 	for (auto item : GetEditors())
 		windows.push_back(item);

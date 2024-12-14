@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <fstream>
 #include <vector>
+#include <filesystem>
 
 // SD Card commands
 enum class SdCommand : uint8_t {
@@ -23,9 +24,14 @@ public:
 	ISpiProvider* spi;
 
 	FakeSdCard(ISpiProvider* spi) : spi(spi), state(State::WaitingCommand) {
-		spi->SetRecvHandler([this](uint8_t d) { OnRead(d); });
-		LoadImage("sdcard.img");
-		std::cout << "[FakeSdCard][Info] Loaded sdcard.img.\n";
+		if (std::filesystem::exists("sdcard.img")) {
+			std::cout << "[FakeSdCard][Warn] No sdcard.img, disabling...\n";
+		}
+		else {
+			spi->SetRecvHandler([this](uint8_t d) { OnRead(d); });
+			LoadImage("sdcard.img");
+			std::cout << "[FakeSdCard][Info] Loaded sdcard.img.\n";
+		}
 	}
 
 private:
