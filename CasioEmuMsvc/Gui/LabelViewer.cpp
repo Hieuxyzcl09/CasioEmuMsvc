@@ -1,8 +1,11 @@
-﻿#include "LabelViewer.h"
+﻿
+#include <algorithm>
+#include "LabelViewer.h"
 #include "Models.h"
 #include "Ui.hpp"
 #include "imgui/imgui.h"
 #include "stringhelper.h"
+
 void LabelViewer::RenderCore() {
 	ImGui::Text("Avaliable in this model:");
 	ImGui::Separator();
