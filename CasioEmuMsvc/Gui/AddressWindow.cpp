@@ -26,8 +26,7 @@ public:
 
 private:
 	std::vector<AddressInfo> addresses;
-	std::optional<uint32_t> newAddress;
-	std::optional<uint8_t> newValue;
+	uint32_t newAddress;
 
 	void RenderAddressTable() {
 		if (ImGui::BeginTable("Addresses", 3, pretty_table)) {
@@ -37,6 +36,7 @@ private:
 			ImGui::TableHeadersRow();
 
 			for (size_t i = 0; i < addresses.size(); ++i) {
+				ImGui::PushID(i + 1145);
 				auto& info = addresses[i];
 
 				ImGui::TableNextRow();
@@ -45,16 +45,19 @@ private:
 
 				ImGui::TableSetColumnIndex(1);
 				uint8_t value = info.value;
-				if (ImGui::InputScalar(("##value" + std::to_string(i)).c_str(), ImGuiDataType_U8, &value)) {
+				if (!info.locked)
+					value = m_emu->chipset.mmu.ReadData(info.address);
+				if (ImGui::InputScalar("##value", ImGuiDataType_U8, &value)) {
 					info.value = value;
 					UpdateMemoryValue(info.address, info.value);
 				}
 
 				ImGui::TableSetColumnIndex(2);
 				bool locked = info.locked;
-				if (ImGui::Checkbox(("##lock" + std::to_string(i)).c_str(), &locked)) {
+				if (ImGui::Checkbox("##lock", &locked)) {
 					info.locked = locked;
 				}
+				ImGui::PopID();
 			}
 
 			ImGui::EndTable();
@@ -64,13 +67,13 @@ private:
 	void RenderAddAddressControls() {
 		ImGui::Text("Add New Address");
 
-		ImGui::InputScalar("Address", ImGuiDataType_U32, &newAddress);
-		ImGui::InputScalar("Value", ImGuiDataType_U8, &newValue);
+		ImGui::InputScalar("Address", ImGuiDataType_U32, &newAddress, 0, 0, "%x");
+		// ImGui::InputScalar("Value", ImGuiDataType_U8, &newValue);
 
 		if (ImGui::Button("Add Address")) {
-			if (newAddress && newValue) {
-				addresses.emplace_back(*newAddress, *newValue, false);
-				UpdateMemoryValue(*newAddress, *newValue);
+			if (newAddress) {
+				addresses.emplace_back(newAddress, 0, false);
+				// UpdateMemoryValue(*newAddress, *newValue);
 			}
 		}
 	}
