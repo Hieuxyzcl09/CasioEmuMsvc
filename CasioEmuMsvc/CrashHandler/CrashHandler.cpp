@@ -1,8 +1,8 @@
 ﻿#ifdef _WIN32
 #include <iostream>
 #include <windows.h>
-
 #include <dbghelp.h>
+#include <TlHelp32.h>
 #pragma comment(lib, "dbghelp.lib")
 
 void CreateMiniDump(EXCEPTION_POINTERS* pExceptionPointers);
@@ -16,14 +16,12 @@ public:
 		SetUnhandledExceptionFilter(CustomUnhandledExceptionFilter);
 	}
 } g_crashhandler;
-
 LONG WINAPI CustomUnhandledExceptionFilter(EXCEPTION_POINTERS* pExceptionPointers) {
 	if (IsDebuggerPresent())
 		return EXCEPTION_CONTINUE_SEARCH;
 	auto code = pExceptionPointers->ExceptionRecord->ExceptionCode;
 	if (code < 0x80000000)
 		return EXCEPTION_CONTINUE_SEARCH;
-
 	CreateMiniDump(pExceptionPointers);
 
 	std::cerr << "\n\n\n!!!\n\nCasioEmuMsvc crashed!\n";
@@ -33,8 +31,37 @@ LONG WINAPI CustomUnhandledExceptionFilter(EXCEPTION_POINTERS* pExceptionPointer
 	PrintStackTrace(pExceptionPointers);
 
 	std::cerr << "Core dumped.\n";
+	std::cerr << "Tips: please send me these files: CasioEmuMsvc.exe, CasioEmuMsvc.pdb, and the crashdump.dmp.\n";
 	std::cerr << "Press any key to close...\n";
 	std::cerr.flush();
+
+	// 获取当前线程ID
+	DWORD currentThreadId = GetCurrentThreadId();
+
+	// 创建线程快照
+	HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	if (hThreadSnap != INVALID_HANDLE_VALUE) {
+		THREADENTRY32 te32;
+		te32.dwSize = sizeof(THREADENTRY32);
+
+		// 遍历所有线程
+		if (Thread32First(hThreadSnap, &te32)) {
+			do {
+				// 如果线程属于当前进程且不是当前线程
+				if (te32.th32OwnerProcessID == GetCurrentProcessId() &&
+					te32.th32ThreadID != currentThreadId) {
+
+					HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te32.th32ThreadID);
+					if (hThread != NULL) {
+						TerminateThread(hThread, 1);
+						CloseHandle(hThread);
+					}
+				}
+			} while (Thread32Next(hThreadSnap, &te32));
+		}
+		CloseHandle(hThreadSnap);
+	}
+
 	std::cin.get();
 	TerminateProcess(GetCurrentProcess(), pExceptionPointers->ExceptionRecord->ExceptionCode);
 	return EXCEPTION_EXECUTE_HANDLER;
@@ -49,7 +76,7 @@ void CreateMiniDump(EXCEPTION_POINTERS* pExceptionPointers) {
 		mdei.ExceptionPointers = pExceptionPointers;
 		mdei.ClientPointers = FALSE;
 
-		MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, MiniDumpNormal, pExceptionPointers ? &mdei : NULL, NULL, NULL);
+		MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, (MINIDUMP_TYPE)(MiniDumpWithFullMemory | MiniDumpScanMemory | MiniDumpWithPrivateReadWriteMemory | MiniDumpWithCodeSegs | MiniDumpWithModuleHeaders | MiniDumpWithProcessThreadData | MiniDumpWithHandleData | MiniDumpWithAvxXStateContext | MiniDumpWithIptTrace | MiniDumpScanInaccessiblePartialPages), pExceptionPointers ? &mdei : NULL, NULL, NULL);
 
 		CloseHandle(hFile);
 	}

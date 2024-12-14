@@ -26,7 +26,7 @@ public:
 
 private:
 	std::vector<AddressInfo> addresses;
-	uint32_t newAddress;
+	uint32_t newAddress = 0;
 
 	void RenderAddressTable() {
 		if (ImGui::BeginTable("Addresses", 3, pretty_table)) {
@@ -47,7 +47,7 @@ private:
 				uint8_t value = info.value;
 				if (!info.locked)
 					value = m_emu->chipset.mmu.ReadData(info.address);
-				if (ImGui::InputScalar("##value", ImGuiDataType_U8, &value)) {
+				if (ImGui::InputScalar("##value", ImGuiDataType_U8, &value, 0, 0, "%x")) {
 					info.value = value;
 					UpdateMemoryValue(info.address, info.value);
 				}

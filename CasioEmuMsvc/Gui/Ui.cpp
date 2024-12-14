@@ -49,6 +49,12 @@ void gui_loop() {
 	for (auto win : windows) {
 		win->Render();
 	}
+	ImGui::Begin("Debug");
+	if (ImGui::Button("Crash")) {
+		throw new std::exception("Intentional crash.");
+	}
+	ImGui::End();
+
 #ifdef __ANDROID__
 	ImGui::SetNextWindowBgAlpha(0.0f); // 设置透明背景
 	ImGui::Begin("Overlay", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove);
