@@ -33,6 +33,7 @@
 #include <cstdlib> // for std::rand
 #include <ctime>   // for std::time
 #include <vector>
+#include <iomanip>
 
 inline constexpr uint8_t reverse_bits(uint8_t n) {
 	uint8_t reversed = 0;
@@ -144,7 +145,6 @@ namespace casioemu {
 		void Uninitialise() override;
 		void Frame() override;
 		void Reset() override;
-
 		void tick() {
 			float ratio = 0;
 			if constexpr (hardware_id == HW_ES_PLUS)
@@ -208,9 +208,9 @@ namespace casioemu {
 				sb = 3;
 			}
 			auto contrast = (int)screen_contrast;
-			//if (screen_contrast2_en) {
+			// if (screen_contrast2_en) {
 			//	contrast += screen_contrast2 * 0.5;
-			//}
+			// }
 			if (contrast < 0) {
 				contrast = 0;
 			}
@@ -723,7 +723,7 @@ namespace casioemu {
 			}
 			else {
 				region_buffer.Setup(
-					0xF800, (N_ROW + 1)* ROW_SIZE, "Screen/Buffer", this,
+					0xF800, (N_ROW + 1) * ROW_SIZE, "Screen/Buffer", this,
 					[](MMURegion* region, size_t offset) {
 						offset -= region->base;
 						if (offset % ROW_SIZE >= ROW_SIZE_DISP)
@@ -952,17 +952,89 @@ namespace casioemu {
 		}
 		enabled_2 = false;
 	}
+	// Function to capture the current screen and save it as a PNG file
+	void CaptureScreenshot(SDL_Renderer* renderer, const std::vector<SDL_Rect>& spriteRects, const std::vector<SDL_Rect>& pixelRects) {
+		// Get current time to generate a unique filename
+		std::time_t t = std::time(nullptr);
+		std::tm tm = *std::localtime(&t);
+		std::ostringstream filename;
+		filename << "screenshot-"
+				 << std::put_time(&tm, "%Y-%m-%d-%H-%M-%S-") << std::rand() % 1000
+				 << ".png"; // Unique filename with timestamp and random number
+
+		// Calculate the bounding box of the rendering area from both sprite and pixel rectangles
+		int minX = INT_MAX, minY = INT_MAX, maxX = INT_MIN, maxY = INT_MIN;
+
+		// Traverse all sprite rectangles
+		for (const auto& rect : spriteRects) {
+			minX = std::min(minX, rect.x);
+			minY = std::min(minY, rect.y);
+			maxX = std::max(maxX, rect.x + rect.w);
+			maxY = std::max(maxY, rect.y + rect.h);
+		}
+
+		// Traverse all pixel rectangles (representing the screen pixels)
+		for (const auto& rect : pixelRects) {
+			minX = std::min(minX, rect.x);
+			minY = std::min(minY, rect.y);
+			maxX = std::max(maxX, rect.x + rect.w);
+			maxY = std::max(maxY, rect.y + rect.h);
+		}
+
+		// Calculate the width and height of the capture area
+		int captureWidth = maxX - minX;
+		int captureHeight = maxY - minY;
+
+		// Create a surface to capture the screen content
+		SDL_Surface* screenSurface = SDL_CreateRGBSurface(0, captureWidth, captureHeight, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+		if (screenSurface != nullptr) {
+			// Define the area to capture
+			SDL_Rect captureRect = {minX, minY, captureWidth, captureHeight};
+
+			// Copy the renderer to the surface
+			if (SDL_RenderReadPixels(renderer, &captureRect, SDL_PIXELFORMAT_RGBA32, screenSurface->pixels, screenSurface->pitch) == 0) {
+				// Save the surface as a PNG file using SDL_image
+				if (IMG_SavePNG(screenSurface, filename.str().c_str()) != 0) {
+					SDL_Log("Error saving screenshot: %s", IMG_GetError());
+				}
+			}
+			else {
+				SDL_Log("Error capturing screen pixels: %s", SDL_GetError());
+			}
+			SDL_FreeSurface(screenSurface); // Free the surface after use
+		}
+		else {
+			SDL_Log("Error creating surface: %s", SDL_GetError());
+		}
+		SDL_Log("Saved screenshot!");
+	}
+
+	// Function to collect all sprite and pixel rectangles
 	template <HardwareId hardware_id>
 	void Screen<hardware_id>::Frame() {
 		int x = 0;
+		int screenWidth = 0, screenHeight = 0;
+
+		// Get the renderer output size if not already available
+		SDL_GetRendererOutputSize(renderer, &screenWidth, &screenHeight);
+
 		if (!emulator.modeldef.enable_new_screen) {
 			SDL_SetTextureColorMod(interface_texture, ink_colour.r, ink_colour.g, ink_colour.b);
 		}
+
+		// Store all the rendering rectangles (sprites and pixel areas)
+		std::vector<SDL_Rect> spriteRects;
+		std::vector<SDL_Rect> pixelRects;
+
+		// Set texture transparency and copy sprites as before
 		for (int ix = 1; ix != SPR_MAX; ++ix) {
 			SDL_SetTextureAlphaMod(interface_texture, Uint8(std::clamp((int)screen_ink_alpha[x], 0, 255)));
 			x++;
 			SDL_RenderCopy(renderer, interface_texture, &sprite_info[ix].src, &sprite_info[ix].dest);
+			// Store the sprite rectangle for later
+			spriteRects.push_back(sprite_info[ix].dest);
 		}
+
 		static constexpr auto SPR_PIXEL = 0;
 		SDL_Rect dest = Screen<hardware_id>::sprite_info[SPR_PIXEL].dest;
 		for (int iy2 = 1; iy2 != (N_ROW + 1); ++iy2) {
@@ -971,6 +1043,7 @@ namespace casioemu {
 			dest.y = sprite_info[SPR_PIXEL].dest.y + (iy2 - 1) * sprite_info[SPR_PIXEL].src.h;
 			for (int ix = 0; ix != ROW_SIZE_DISP; ++ix) {
 				for (uint8_t mask = 0x80; mask; mask >>= 1, dest.x += sprite_info[SPR_PIXEL].src.w) {
+					// Calculate pixel-specific colors and modify texture
 					if (screen_ink_alpha[x + iy2 * 192] > 255) {
 						SDL_SetTextureColorMod(interface_texture,
 							std::max(0, ink_colour.r - (int)(screen_ink_alpha[x + iy2 * 192] - 255)),
@@ -984,10 +1057,20 @@ namespace casioemu {
 					}
 					x++;
 					SDL_RenderCopy(renderer, interface_texture, &sprite_info[SPR_PIXEL].src, &dest);
+					// Store the pixel rectangle for later
+					pixelRects.push_back(dest);
 				}
 			}
 		}
+
+		// If screenshot is requested, capture only the rendered screen region
+		if (emulator.screenshot_requested.load()) {
+			// Capture the region using both sprite and pixel rectangles
+			CaptureScreenshot(renderer, spriteRects, pixelRects);
+			emulator.screenshot_requested.store(false);
+		}
 	}
+
 
 	template <HardwareId hardware_id>
 	void Screen<hardware_id>::Reset() {

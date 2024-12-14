@@ -35,33 +35,6 @@ LONG WINAPI CustomUnhandledExceptionFilter(EXCEPTION_POINTERS* pExceptionPointer
 	std::cerr << "Press any key to close...\n";
 	std::cerr.flush();
 
-	// 获取当前线程ID
-	DWORD currentThreadId = GetCurrentThreadId();
-
-	// 创建线程快照
-	HANDLE hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-	if (hThreadSnap != INVALID_HANDLE_VALUE) {
-		THREADENTRY32 te32;
-		te32.dwSize = sizeof(THREADENTRY32);
-
-		// 遍历所有线程
-		if (Thread32First(hThreadSnap, &te32)) {
-			do {
-				// 如果线程属于当前进程且不是当前线程
-				if (te32.th32OwnerProcessID == GetCurrentProcessId() &&
-					te32.th32ThreadID != currentThreadId) {
-
-					HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te32.th32ThreadID);
-					if (hThread != NULL) {
-						TerminateThread(hThread, 1);
-						CloseHandle(hThread);
-					}
-				}
-			} while (Thread32Next(hThreadSnap, &te32));
-		}
-		CloseHandle(hThreadSnap);
-	}
-
 	std::cin.get();
 	TerminateProcess(GetCurrentProcess(), pExceptionPointers->ExceptionRecord->ExceptionCode);
 	return EXCEPTION_EXECUTE_HANDLER;

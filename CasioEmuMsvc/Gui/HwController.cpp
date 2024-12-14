@@ -13,7 +13,7 @@ bool audio_enable = false;
 void HwController::RenderCore() {
 
 	if (ImGui::Button("Screenshot the screen")) {
-
+		m_emu->screenshot_requested.store(true);
 	}
 	ImGui::SliderInt(
 #if LANGUAGE == 2

@@ -164,7 +164,11 @@ namespace casioemu {
 
 	void Emulator::UIEvent(SDL_Event& event) {
 		// std::lock_guard<decltype(access_mx)> access_lock(access_mx);
-
+		if (event.type == SDL_KEYDOWN) {
+			if (event.key.keysym.sym == SDL_KeyCode::SDLK_F12) {
+				screenshot_requested.store(true);
+			}
+		}
 		switch (event.type) {
 		case SDL_MOUSEBUTTONDOWN:
 		case SDL_MOUSEBUTTONUP:
@@ -232,7 +236,6 @@ namespace casioemu {
 		// std::lock_guard<decltype(access_mx)> access_lock(access_mx);
 		// SDL_RenderPresent(renderer);
 	}
-
 	void Emulator::Frame() {
 		// std::lock_guard<decltype(access_mx)> access_lock(access_mx);
 
